@@ -1,5 +1,5 @@
 # pfsenseBackup
-Backup script for Pfsense 2.3 or above. Downloads config file to direcotry and store it as a gzip file. Based on information from the pfsense doc https://doc.pfsense.org/index.php/Remote_Config_Backup
+Backup script for pfSense 2.3 or above. Downloads config file to directory and store it as a gzip file. Based on information from the pfSense doc https://doc.pfsense.org/index.php/Remote_Config_Backup
 
 #### Example:
 pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -u admin -p mypassword
