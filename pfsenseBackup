@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while getopts 'n:d:h:u:p:' flag; do
+while getopts 'd:h:u:p:' flag; do
   case "${flag}" in
     d) directory="${OPTARG}" ;;
     h) host="${OPTARG}" ;;
@@ -37,7 +37,7 @@ fi
 
 if ! hash gzip 2>/dev/null; then
   echo "gzip is required, plase install, for centos 7 run 'yum install gzip -y'"
-  exit 3;
+  exit 4;
 fi
 
 date=`date +%Y%m%d-%H%M%S`;
@@ -67,7 +67,7 @@ rm cookies.tmp csrf.1.tmp csrf.2.tmp
 # Validation
 if [ ! -f "$backupFile" ] ; then
   echo "Backupfile $backupFile not downloaded";
-  exit 4;
+  exit 5;
 fi;
 
 if grep -xq "<pfsense>" "$backupFile" ; then
@@ -78,5 +78,5 @@ else
     rm $backupFile;
     echo "<pfsense> not found in config, corrupt configfile";
     echo "Possible reason: wrong credentials are used to login against pfsense";
-    exit 5;
+    exit 6;
 fi
