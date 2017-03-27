@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while getopts 'd:h:u:p:' flag; do
+while getopts 'n:d:h:u:p:' flag; do
   case "${flag}" in
     d) directory="${OPTARG}" ;;
     h) host="${OPTARG}" ;;
@@ -24,3 +24,57 @@ if [ -z $directory ] || [ -z $host ] || [ -z $username ] || [ -z $password ] ; t
 	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -u admin -p mypassword"
 	exit 1;
 fi;
+
+if [ ! -d "$directory" ] && [ ! -w "$directory" ] ; then
+  echo "$directory does not exist or is not writable by this user $USER" ;
+  exit 2;
+fi;
+
+if ! hash wget 2>/dev/null; then
+  echo "wget is required, plase install, for centos 7 run 'yum install wget -y'"
+  exit 3;
+fi
+
+if ! hash gzip 2>/dev/null; then
+  echo "gzip is required, plase install, for centos 7 run 'yum install gzip -y'"
+  exit 3;
+fi
+
+date=`date +%Y%m%d-%H%M%S`;
+backupFile=config-$host-`date +%Y%m%d-%H%M%S`.xml;
+
+# Getting backup
+cd $directory;
+wget -qO- -t 3 --timeout=60 --keep-session-cookies --save-cookies cookies.tmp \
+  --no-check-certificate https://$host/diag_backup.php \
+  | grep "name='__csrf_magic'" | sed 's/.*value="\(.*\)".*/\1/' > csrf.1.tmp
+
+wget -qO- -t 3 --timeout=60 --keep-session-cookies --load-cookies cookies.tmp \
+  --save-cookies cookies.tmp --no-check-certificate \
+  --post-data "login=Login&usernamefld=$username&passwordfld=$password&__csrf_magic=$(cat csrf.1.tmp)" \
+  https://$host/diag_backup.php  | grep "name='__csrf_magic'" \
+  | sed 's/.*value="\(.*\)".*/\1/' > csrf.2.tmp
+
+wget -qO- -t 3 --timeout=60 --keep-session-cookies --load-cookies cookies.tmp --no-check-certificate \
+  --post-data "download=download&donotbackuprrd=yes&__csrf_magic=$(head -n 1 csrf.2.tmp)" \
+  https://$host/diag_backup.php -O $backupFile
+
+# Cleanup
+rm cookies.tmp csrf.1.tmp csrf.2.tmp
+
+# Validation
+if [ ! -f "$backupFile" ] ; then
+  echo "Backupfile $backupFile not downloaded";
+  exit 4;
+fi;
+
+if grep -xq "<pfsense>" "$backupFile" ; then
+    gzip $backupFile;
+    realpath $backupFile.gz
+    exit 0;
+else
+    # code if not found
+    echo "<pfsense> not found in config, corrupt configfile";
+    echo "Possible reason: wrong credentials are used to login against pfsense";
+    exit 5;
+fi
