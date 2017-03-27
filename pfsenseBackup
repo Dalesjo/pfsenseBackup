@@ -45,6 +45,8 @@ backupFile=config-$host-`date +%Y%m%d-%H%M%S`.xml;
 
 # Getting backup
 cd $directory;
+umask 0027;
+
 wget -qO- -t 3 --timeout=60 --keep-session-cookies --save-cookies cookies.tmp \
   --no-check-certificate https://$host/diag_backup.php \
   | grep "name='__csrf_magic'" | sed 's/.*value="\(.*\)".*/\1/' > csrf.1.tmp
@@ -70,10 +72,10 @@ fi;
 
 if grep -xq "<pfsense>" "$backupFile" ; then
     gzip $backupFile;
-    realpath $backupFile.gz
     exit 0;
 else
     # code if not found
+    rm $backupFile;
     echo "<pfsense> not found in config, corrupt configfile";
     echo "Possible reason: wrong credentials are used to login against pfsense";
     exit 5;
