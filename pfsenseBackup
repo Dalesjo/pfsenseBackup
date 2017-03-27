@@ -1,0 +1,26 @@
+#!/bin/bash
+
+while getopts 'd:h:u:p:' flag; do
+  case "${flag}" in
+    d) directory="${OPTARG}" ;;
+    h) host="${OPTARG}" ;;
+    u) username="${OPTARG}" ;;
+    p) password="${OPTARG}" ;;
+  esac
+done
+
+if [ -z $directory ] || [ -z $host ] || [ -z $username ] || [ -z $password ] ; then
+	echo "pfsenseBackup [OPTIONS...]"
+	echo "";
+	echo "Backup a remote pfSense 2.3.3 or later."
+	echo "";
+	echo "Flags:";
+	echo "  -d    Directory you want your backups to be saved in"
+	echo "  -h    IP Address or hostname to your pfsense"
+	echo "  -u    username to your pfsense"
+	echo "  -p    password to your pfsense"
+	echo "";
+	echo "Example:";
+	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -u admin -p mypassword"
+	exit 1;
+fi;
