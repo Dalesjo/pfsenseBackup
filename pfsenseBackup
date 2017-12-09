@@ -3,7 +3,7 @@
 # Default settings
 port=443
 
-while getopts 'd:h:u:p:' flag; do
+while getopts 'd:h:P:u:p:' flag; do
   case "${flag}" in
     d) directory="${OPTARG}" ;;
     h) host="${OPTARG}" ;;
@@ -54,38 +54,46 @@ md5File=checksums-$host.md5;
 cd $directory;
 umask 0027;
 
-wget -qO- -t 3 --timeout=60 --keep-session-cookies --save-cookies cookies.tmp \
+wget -qO- -t 3 --timeout=6 --keep-session-cookies --save-cookies /tmp/pfsenseBackupCookies.tmp \
   --no-check-certificate https://$host:$port/diag_backup.php \
-  | grep "name='__csrf_magic'" | sed 's/.*value="\(.*\)".*/\1/' > csrf.1.tmp
+  | grep "name='__csrf_magic'" | sed 's/.*value="\(.*\)".*/\1/' > pfsenseBackupCookies.csrf.1.tmp
 
-wget -qO- -t 3 --timeout=60 --keep-session-cookies --load-cookies cookies.tmp \
-  --save-cookies cookies.tmp --no-check-certificate \
-  --post-data "login=Login&usernamefld=$username&passwordfld=$password&__csrf_magic=$(cat csrf.1.tmp)" \
-  https://$host:$port/diag_backup.php  | grep "name='__csrf_magic'" \
-  | sed 's/.*value="\(.*\)".*/\1/' > csrf.2.tmp
+# ${PIPESTATUS[0]} can only be used once (changes on next lines execution)
+connection=${PIPESTATUS[0]}
 
-wget -qO- -t 3 --timeout=60 --keep-session-cookies --load-cookies cookies.tmp --no-check-certificate \
-  --post-data "download=download&donotbackuprrd=yes&__csrf_magic=$(head -n 1 csrf.2.tmp)" \
-  https://$host:$port/diag_backup.php -O $backupFile
+if [ $connection -eq "0" ] ; then
 
-# Cleanup
-rm cookies.tmp csrf.1.tmp csrf.2.tmp
+  wget -qO- -t 3 --timeout=30 --waitretry=1 --keep-session-cookies --load-cookies pfsenseBackupCookies.tmp \
+    --save-cookies pfsenseBackupCookies.tmp --no-check-certificate \
+    --post-data "login=Login&usernamefld=$username&passwordfld=$password&__csrf_magic=$(cat pfsenseBackupCookies.csrf.1.tmp)" \
+    https://$host:$port/diag_backup.php  | grep "name='__csrf_magic'" \
+    | sed 's/.*value="\(.*\)".*/\1/' > pfsenseBackupCookies.csrf.2.tmp
 
-# Validation
-if [ ! -f "$backupFile" ] ; then
-  echo "Backupfile $backupFile not downloaded";
-  exit 5;
-fi;
+  wget -qO- -t 3 --timeout=30 --keep-session-cookies --load-cookies pfsenseBackupCookies.tmp --no-check-certificate \
+    --post-data "download=download&donotbackuprrd=yes&__csrf_magic=$(head -n 1 pfsenseBackupCookies.csrf.2.tmp)" \
+    https://$host:$port/diag_backup.php -O $backupFile
 
-if grep -xq "<pfsense>" "$backupFile" ; then
-    gzip $backupFile;
-    md5sum $backupFile.gz >> $md5File
+  # Cleanup
+  rm pfsenseBackupCookies.tmp pfsenseBackupCookies.csrf.1.tmp pfsenseBackupCookies.csrf.2.tmp
 
-    exit 0;
+  # Validation
+  if [ ! -f "$backupFile" ] ; then
+    echo "Backupfile $backupFile not downloaded";
+    exit 5;
+  fi;
+
+  if grep -xq "<pfsense>" "$backupFile" ; then
+      gzip $backupFile;
+      md5sum $backupFile.gz >> $md5File
+
+      exit 0;
+  else
+      # code if not found
+      rm $backupFile;
+      echo "<pfsense> not found in config, corrupt configfile";
+      echo "Possible reason: wrong credentials are used to login against pfsense";
+      exit 6;
+  fi
 else
-    # code if not found
-    rm $backupFile;
-    echo "<pfsense> not found in config, corrupt configfile";
-    echo "Possible reason: wrong credentials are used to login against pfsense";
-    exit 6;
-fi
+  echo "Server $host did not respond on port $port please check your configuration";
+fi;
