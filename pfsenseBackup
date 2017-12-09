@@ -1,9 +1,13 @@
 #!/bin/bash
 
+# Default settings
+port=443
+
 while getopts 'd:h:u:p:' flag; do
   case "${flag}" in
     d) directory="${OPTARG}" ;;
     h) host="${OPTARG}" ;;
+    P) port="${OPTARG}" ;;
     u) username="${OPTARG}" ;;
     p) password="${OPTARG}" ;;
   esac
@@ -13,15 +17,17 @@ if [ -z $directory ] || [ -z $host ] || [ -z $username ] || [ -z $password ] ; t
 	echo "pfsenseBackup [OPTIONS...]"
 	echo "";
 	echo "Backup a remote pfSense 2.3.3 or later."
+  echo "Backup is done over https"
 	echo "";
 	echo "Flags:";
 	echo "  -d    Directory you want your backups to be saved in"
 	echo "  -h    IP Address or hostname to your pfsense"
-	echo "  -u    username to your pfsense"
-	echo "  -p    password to your pfsense"
+  echo "  -P    Port used to connect to your pfsense, default is 443"
+	echo "  -u    Username to your pfsense"
+	echo "  -p    Password to your pfsense"
 	echo "";
 	echo "Example:";
-	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -u admin -p mypassword"
+	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -P 443 -u admin -p mypassword"
 	exit 1;
 fi;
 
@@ -49,18 +55,18 @@ cd $directory;
 umask 0027;
 
 wget -qO- -t 3 --timeout=60 --keep-session-cookies --save-cookies cookies.tmp \
-  --no-check-certificate https://$host/diag_backup.php \
+  --no-check-certificate https://$host:$port/diag_backup.php \
   | grep "name='__csrf_magic'" | sed 's/.*value="\(.*\)".*/\1/' > csrf.1.tmp
 
 wget -qO- -t 3 --timeout=60 --keep-session-cookies --load-cookies cookies.tmp \
   --save-cookies cookies.tmp --no-check-certificate \
   --post-data "login=Login&usernamefld=$username&passwordfld=$password&__csrf_magic=$(cat csrf.1.tmp)" \
-  https://$host/diag_backup.php  | grep "name='__csrf_magic'" \
+  https://$host:$port/diag_backup.php  | grep "name='__csrf_magic'" \
   | sed 's/.*value="\(.*\)".*/\1/' > csrf.2.tmp
 
 wget -qO- -t 3 --timeout=60 --keep-session-cookies --load-cookies cookies.tmp --no-check-certificate \
   --post-data "download=download&donotbackuprrd=yes&__csrf_magic=$(head -n 1 csrf.2.tmp)" \
-  https://$host/diag_backup.php -O $backupFile
+  https://$host:$port/diag_backup.php -O $backupFile
 
 # Cleanup
 rm cookies.tmp csrf.1.tmp csrf.2.tmp
