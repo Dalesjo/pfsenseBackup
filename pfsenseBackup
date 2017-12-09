@@ -2,14 +2,16 @@
 
 # Default settings
 port=443
+daily=0
 
-while getopts 'd:h:P:u:p:' flag; do
+while getopts 'd:h:P:u:p:D' flag; do
   case "${flag}" in
     d) directory="${OPTARG}" ;;
     h) host="${OPTARG}" ;;
     P) port="${OPTARG}" ;;
     u) username="${OPTARG}" ;;
     p) password="${OPTARG}" ;;
+    D) daily=1 ;;
   esac
 done
 
@@ -25,9 +27,10 @@ if [ -z $directory ] || [ -z $host ] || [ -z $username ] || [ -z $password ] ; t
   echo "  -P    Port used to connect to your pfsense, default is 443"
 	echo "  -u    Username to your pfsense"
 	echo "  -p    Password to your pfsense"
+  echo "  -D    Only backup if there is not backup for the same date yet."
 	echo "";
 	echo "Example:";
-	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -P 443 -u admin -p mypassword"
+	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -P 443 -u admin -p mypassword -D"
 	exit 1;
 fi;
 
@@ -48,11 +51,18 @@ fi
 
 date=`date +%Y%m%d-%H%M%S`;
 backupFile=config-$host-`date +%Y%m%d-%H%M%S`.xml;
+today=config-$host-`date +%Y%m%d-`
 md5File=checksums-$host.md5;
 
 # Getting backup
 cd $directory;
 umask 0027;
+
+if [ $daily -eq "1" ] ; then
+  if ! find $directory -type f -name "$today*" -exec false {} + ; then
+    exit;
+  fi;
+fi;
 
 wget -qO- -t 3 --timeout=6 --keep-session-cookies --save-cookies /tmp/pfsenseBackupCookies.tmp \
   --no-check-certificate https://$host:$port/diag_backup.php \
