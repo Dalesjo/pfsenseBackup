@@ -3,15 +3,18 @@
 # Default settings
 port=443
 daily=0
+ping=0
 
-while getopts 'd:h:P:u:p:D' flag; do
+while getopts 'd:Dh:p:P:qu:' flag; do
   case "${flag}" in
     d) directory="${OPTARG}" ;;
+    D) daily=1 ;;
     h) host="${OPTARG}" ;;
+
+    p) password="${OPTARG}" ;;
     P) port="${OPTARG}" ;;
     u) username="${OPTARG}" ;;
-    p) password="${OPTARG}" ;;
-    D) daily=1 ;;
+    q) ping=1;;
   esac
 done
 
@@ -23,11 +26,12 @@ if [ -z $directory ] || [ -z $host ] || [ -z $username ] || [ -z $password ] ; t
 	echo "";
 	echo "Flags:";
 	echo "  -d    Directory you want your backups to be saved in"
-	echo "  -h    IP Address or hostname to your pfsense"
-  echo "  -P    Port used to connect to your pfsense, default is 443"
-	echo "  -u    Username to your pfsense"
-	echo "  -p    Password to your pfsense"
   echo "  -D    Only backup if there is not backup for the same date yet."
+  echo "  -h    IP Address or hostname to your pfsense"
+	echo "  -p    Password to your pfsense"
+  echo "  -P    Port used to connect to your pfsense, default is 443"
+  echo "  -q    Quitly exits with exitcode 0 if pfsense is not responding to ping"
+  echo "  -u    Username to your pfsense"
 	echo "";
 	echo "Example:";
 	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -P 443 -u admin -p mypassword -D"
@@ -54,13 +58,21 @@ backupFile=config-$host-`date +%Y%m%d-%H%M%S`.xml;
 today=config-$host-`date +%Y%m%d-`
 md5File=checksums-$host.md5;
 
-# Getting backup
+# going to backupdirectory
 cd $directory;
 umask 0027;
 
+# Checking if backup file already exists for today
 if [ $daily -eq "1" ] ; then
   if ! find $directory -type f -name "$today*" -exec false {} + ; then
     exit;
+  fi;
+fi;
+
+# check if firewall is responding to ping
+if [ $ping -eq "1" ] ; then
+  if ! ping -w 4 -c 1 $host > /dev/null 2>&1 ; then
+    exit
   fi;
 fi;
 
@@ -106,4 +118,5 @@ if [ $connection -eq "0" ] ; then
   fi
 else
   echo "Server $host did not respond on port $port please check your configuration";
+  exit 7;
 fi;

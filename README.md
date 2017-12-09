@@ -12,3 +12,4 @@ pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -P 443 -u admin -p mypasswo
 4) gzip is missing or can not be found in path.
 5) backupfile could not be downloaded, possible network error/timeout.
 6) backupfile does not include xml tag &lt;pfsense&gt;, possible wrong credentials.
+7) webconfiguration is not responding on used port.
