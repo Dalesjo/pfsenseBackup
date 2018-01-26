@@ -29,11 +29,11 @@ if [ -z $directory ] || [ -z $host ] || [ -z $username ] || [ -z $password ] ; t
 	echo "  -d    Directory you want your backups to be saved in"
   echo "  -D    Only backup if there is not backup for the same date yet."
   echo "  -h    IP Address or hostname to your pfsense"
-	echo "  -p    Password to your pfsense"
+	echo "  -p    Password for your pfsense"
   echo "  -P    Port used to connect to your pfsense, default is 443"
   echo "  -t    tmp directory used then creating backup, default is /tmp"
-  echo "  -q    Quitly exits with exitcode 0 if pfsense is not responding to ping"
-  echo "  -u    Username to your pfsense"
+  echo "  -q    Quietly exits with exitcode 0 if pfsense is not responding to ping"
+  echo "  -u    Username for your pfsense"
 	echo "";
 	echo "Example:";
 	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -P 443 -u admin -p mypassword -D"
@@ -51,12 +51,12 @@ if [ ! -d "$directory" ] && [ ! -w "$directory" ] ; then
 fi;
 
 if ! hash wget 2>/dev/null; then
-  echo "wget is required, plase install, for centos 7 run 'yum install wget -y'"
+  echo "wget is required, please install, for centos 7 run 'yum install wget -y'"
   exit 3;
 fi
 
 if ! hash gzip 2>/dev/null; then
-  echo "gzip is required, plase install, for centos 7 run 'yum install gzip -y'"
+  echo "gzip is required, please install, for centos 7 run 'yum install gzip -y'"
   exit 4;
 fi
 
