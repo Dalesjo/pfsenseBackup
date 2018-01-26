@@ -4,15 +4,16 @@
 port=443
 daily=0
 ping=0
+tmp="/tmp"
 
-while getopts 'd:Dh:p:P:qu:' flag; do
+while getopts 'd:Dh:p:P:t:u:q' flag; do
   case "${flag}" in
     d) directory="${OPTARG}" ;;
     D) daily=1 ;;
     h) host="${OPTARG}" ;;
-
     p) password="${OPTARG}" ;;
     P) port="${OPTARG}" ;;
+    t) tmp="${OPTARG}" ;;
     u) username="${OPTARG}" ;;
     q) ping=1;;
   esac
@@ -30,12 +31,18 @@ if [ -z $directory ] || [ -z $host ] || [ -z $username ] || [ -z $password ] ; t
   echo "  -h    IP Address or hostname to your pfsense"
 	echo "  -p    Password to your pfsense"
   echo "  -P    Port used to connect to your pfsense, default is 443"
+  echo "  -t    tmp directory used then creating backup, default is /tmp"
   echo "  -q    Quitly exits with exitcode 0 if pfsense is not responding to ping"
   echo "  -u    Username to your pfsense"
 	echo "";
 	echo "Example:";
 	echo "pfsenseBackup -d /var/backup/pfsense/ -h 192.168.0.1 -P 443 -u admin -p mypassword -D"
 	exit 1;
+fi;
+
+if [ ! -d "$tmp" ]  && [ ! -w "$tmp" ] ; then
+    echo "$tmp does not exist or is not writable by this user $USER";
+    exit 8;
 fi;
 
 if [ ! -d "$directory" ] && [ ! -w "$directory" ] ; then
@@ -57,10 +64,11 @@ date=`date +%Y%m%d-%H%M%S`;
 backupFile=config-$host-`date +%Y%m%d-%H%M%S`.xml;
 today=config-$host-`date +%Y%m%d-`
 md5File=checksums-$host.md5;
+random=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1);
 
 # going to backupdirectory
 cd $directory;
-umask 0027;
+umask 0077;
 
 # Checking if backup file already exists for today
 if [ $daily -eq "1" ] ; then
@@ -76,27 +84,27 @@ if [ $ping -eq "1" ] ; then
   fi;
 fi;
 
-wget -qO- -t 3 --timeout=6 --keep-session-cookies --save-cookies /tmp/pfsenseBackupCookies.tmp \
+wget -qO- -t 3 --timeout=6 --keep-session-cookies --save-cookies $tmp/pfsenseBackupCookies.$random.tmp \
   --no-check-certificate https://$host:$port/diag_backup.php \
-  | grep "name='__csrf_magic'" | sed 's/.*value="\(.*\)".*/\1/' > pfsenseBackupCookies.csrf.1.tmp
+  | grep "name='__csrf_magic'" | sed 's/.*value="\(.*\)".*/\1/' > $tmp/pfsenseBackupCookies.$random.csrf.1.tmp
 
 # ${PIPESTATUS[0]} can only be used once (changes on next lines execution)
 connection=${PIPESTATUS[0]}
 
 if [ $connection -eq "0" ] ; then
 
-  wget -qO- -t 3 --timeout=30 --waitretry=1 --keep-session-cookies --load-cookies pfsenseBackupCookies.tmp \
-    --save-cookies pfsenseBackupCookies.tmp --no-check-certificate \
-    --post-data "login=Login&usernamefld=$username&passwordfld=$password&__csrf_magic=$(cat pfsenseBackupCookies.csrf.1.tmp)" \
+  wget -qO- -t 3 --timeout=30 --waitretry=1 --keep-session-cookies --load-cookies $tmp/pfsenseBackupCookies.$random.tmp \
+    --save-cookies $tmp/pfsenseBackupCookies.$random.tmp --no-check-certificate \
+    --post-data "login=Login&usernamefld=$username&passwordfld=$password&__csrf_magic=$(cat $tmp/pfsenseBackupCookies.$random.csrf.1.tmp)" \
     https://$host:$port/diag_backup.php  | grep "name='__csrf_magic'" \
-    | sed 's/.*value="\(.*\)".*/\1/' > pfsenseBackupCookies.csrf.2.tmp
+    | sed 's/.*value="\(.*\)".*/\1/' > $tmp/pfsenseBackupCookies.$random.csrf.2.tmp
 
-  wget -qO- -t 3 --timeout=30 --keep-session-cookies --load-cookies pfsenseBackupCookies.tmp --no-check-certificate \
-    --post-data "download=download&donotbackuprrd=yes&__csrf_magic=$(head -n 1 pfsenseBackupCookies.csrf.2.tmp)" \
+  wget -qO- -t 3 --timeout=30 --keep-session-cookies --load-cookies $tmp/pfsenseBackupCookies.$random.tmp --no-check-certificate \
+    --post-data "download=download&donotbackuprrd=yes&__csrf_magic=$(head -n 1 $tmp/pfsenseBackupCookies.$random.csrf.2.tmp)" \
     https://$host:$port/diag_backup.php -O $backupFile
 
   # Cleanup
-  rm pfsenseBackupCookies.tmp pfsenseBackupCookies.csrf.1.tmp pfsenseBackupCookies.csrf.2.tmp
+  rm $tmp/pfsenseBackupCookies.$random.tmp $tmp/pfsenseBackupCookies.$random.csrf.1.tmp $tmp/pfsenseBackupCookies.$random.csrf.2.tmp
 
   # Validation
   if [ ! -f "$backupFile" ] ; then
